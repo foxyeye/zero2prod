@@ -30,6 +30,7 @@ services:
     environment:
       APP_DATABASE__HOST: "postgres" 
       APP_DATABASE__PORT: 5432 
+      # APP_ENVIRONMENT: local
       # DATABASE_URL: "postgres://postgres:password@postgres:5432/newsletter"
       # APP_ENVIRONMENT: "production"
     ports:
