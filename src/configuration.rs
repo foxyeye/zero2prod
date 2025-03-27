@@ -99,7 +99,7 @@ impl DatabaseSettings {
             .ssl_mode(ssl_mode)
     }
     pub fn with_db(&self) -> PgConnectOptions {
-        let mut options = self.without_db().database(&self.database_name);
+        let options = self.without_db().database(&self.database_name);
         options.log_statements(tracing::log::LevelFilter::Trace)
     }
     //pub fn connection_string(&self) -> SecretBox<String> {
