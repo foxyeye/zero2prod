@@ -1,0 +1,41 @@
+
+services:
+  # PostgreSQL 服务
+  postgres:
+    image: postgres:latest
+    environment:
+      POSTGRES_USER:  postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: newsletter
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d newsletter"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # Rust 应用服务
+  zero2prod:
+    # image: zero2prod:latest
+    build:
+      context: .
+      dockerfile: Dockerfile
+    depends_on:
+
+      postgres:
+        condition: service_healthy
+    environment:
+      # DATABASE_URL: "postgres://postgres:password@postgres:5432/newsletter"
+      APP_ENVIRONMENT: "production"
+    ports:
+      - "8000:8000"  # 假设你的 Rust 应用监听 8000 端口
+
+    # volumes:
+    #
+    #   - ./:/app  # 如果需要挂载本地代码用于开发
+
+volumes:
+  postgres_data:
