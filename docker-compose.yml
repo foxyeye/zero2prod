@@ -19,7 +19,7 @@ services:
 
   # Rust 应用服务
   zero2prod:
-    # image: zero2prod:latest
+    image: zero2prod:latest
     build:
       context: .
       dockerfile: Dockerfile
@@ -28,8 +28,10 @@ services:
       postgres:
         condition: service_healthy
     environment:
+      APP_DATABASE__HOST: "postgres" 
+      APP_DATABASE__PORT: 5432 
       # DATABASE_URL: "postgres://postgres:password@postgres:5432/newsletter"
-      APP_ENVIRONMENT: "production"
+      # APP_ENVIRONMENT: "production"
     ports:
       - "8000:8000"  # 假设你的 Rust 应用监听 8000 端口
 
