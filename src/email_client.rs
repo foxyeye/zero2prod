@@ -1,7 +1,6 @@
 use crate::domain::SubscriberEmail;
-use config::builder;
 use reqwest::Client;
-use secrecy::{ExposeSecret, SecretBox, SecretString};
+use secrecy::{ExposeSecret, SecretBox};
 
 pub struct EmailClient {
     sender: SubscriberEmail,
@@ -75,7 +74,7 @@ mod tests {
     use fake::{Fake, Faker};
     use secrecy::SecretBox;
     use serde_json::{Result, Value};
-    use wiremock::matchers::{any, header, header_exists, method, path};
+    use wiremock::matchers::{any, header, header_exists, method};
     use wiremock::Request;
     use wiremock::{Mock, MockServer, ResponseTemplate};
 
