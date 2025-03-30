@@ -1,12 +1,13 @@
 use crate::domain::SubscriberEmail;
 use reqwest::Client;
-use secrecy::{ExposeSecret, SecretBox};
+use secrecy::{ExposeSecret, SecretString};
 
+#[derive(Clone)]
 pub struct EmailClient {
     sender: SubscriberEmail,
     http_client: Client,
     base_url: String,
-    authorization_token: SecretBox<String>,
+    authorization_token: SecretString,
 }
 
 #[derive(serde::Serialize)]
@@ -23,7 +24,7 @@ impl EmailClient {
     pub fn new(
         base_url: String,
         sender: SubscriberEmail,
-        authorization_token: SecretBox<String>,
+        authorization_token: SecretString,
         timeout: std::time::Duration,
     ) -> Self {
         let http_client = Client::builder().timeout(timeout).build().unwrap();
@@ -44,7 +45,7 @@ impl EmailClient {
         let request_body = SendEmailRequest {
             from: self.sender.as_ref(),
             to: recipient.as_ref(),
-            subject: subject,
+            subject,
             html_body: html_content,
             text_body: text_content,
         };
@@ -72,7 +73,7 @@ mod tests {
     use fake::faker::internet::en::SafeEmail;
     use fake::faker::lorem::en::{Paragraph, Sentence};
     use fake::{Fake, Faker};
-    use secrecy::SecretBox;
+    use secrecy::SecretString;
     use serde_json::{Result, Value};
     use wiremock::matchers::{any, header, header_exists, method};
     use wiremock::Request;
@@ -96,7 +97,7 @@ mod tests {
         EmailClient::new(
             base_url,
             email(),
-            SecretBox::new(Box::new(Faker.fake())),
+            SecretString::from(Faker.fake::<String>()),
             std::time::Duration::from_millis(200),
         )
     }

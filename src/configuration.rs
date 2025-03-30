@@ -1,21 +1,21 @@
 use crate::domain::SubscriberEmail;
 use config::{Config, File};
-use secrecy::{ExposeSecret, SecretBox};
+use secrecy::{ExposeSecret, SecretString};
 use sqlx::postgres::{PgConnectOptions, PgSslMode};
 use sqlx::ConnectOptions;
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, Clone)]
 pub struct Settings {
     pub database: DatabaseSettings,
     pub application: ApplicationSettings,
     pub email_client: EmailClientSettings,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, Clone)]
 pub struct EmailClientSettings {
     pub base_url: String,
     pub sender_email: String,
-    pub authorization_token: SecretBox<String>,
+    pub authorization_token: SecretString,
     pub timeout_milliseconds: u64,
 }
 
@@ -28,17 +28,17 @@ impl EmailClientSettings {
     }
 }
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, Clone)]
 pub struct DatabaseSettings {
     pub username: String,
-    pub password: SecretBox<String>,
+    pub password: SecretString,
     pub port: u16,
     pub host: String,
     pub database_name: String,
     pub require_ssl: bool,
 }
 
-#[derive(serde::Deserialize)]
+#[derive(serde::Deserialize, Clone)]
 pub struct ApplicationSettings {
     pub port: u16,
     pub host: String,
@@ -73,10 +73,6 @@ impl TryFrom<String> for Environment {
 }
 
 pub fn get_configuration() -> Result<Settings, config::ConfigError> {
-    //let mut settings = config::Config::default();
-    //settings.merge(config::File::with_name("configuration"))?;
-    //settings.try_into()
-
     let base_path = std::env::current_dir().expect("Failed to determine the current directory");
     let base_configuration_file = base_path.join("configuration").join("base");
     let environment: Environment = std::env::var("APP_ENVIRONMENT")
@@ -121,24 +117,4 @@ impl DatabaseSettings {
         let options = self.without_db().database(&self.database_name);
         options.log_statements(tracing::log::LevelFilter::Trace)
     }
-    //pub fn connection_string(&self) -> SecretBox<String> {
-    //    SecretBox::new(Box::new(format!(
-    //        "postgres://{}:{}@{}:{}/{}",
-    //        self.username,
-    //        self.password.expose_secret(),
-    //        self.host,
-    //        self.port,
-    //        self.database_name
-    //    )))
-    //}
-    //
-    //pub fn connection_string_without_db(&self) -> SecretBox<String> {
-    //    SecretBox::new(Box::new(format!(
-    //        "postgres://{}:{}@{}:{}",
-    //        self.username,
-    //        self.password.expose_secret(),
-    //        self.host,
-    //        self.port
-    //    )))
-    //}
 }
