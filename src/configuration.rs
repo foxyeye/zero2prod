@@ -42,6 +42,7 @@ pub struct DatabaseSettings {
 pub struct ApplicationSettings {
     pub port: u16,
     pub host: String,
+    pub base_url: String,
 }
 
 pub enum Environment {
