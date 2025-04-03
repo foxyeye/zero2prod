@@ -106,7 +106,7 @@ VALUES ($1, $2)"#,
     .execute(&mut **transaction)
     .await
     .map_err(|e| {
-        tracing::error!("Failed to execute query: {:?}", e);
+        // tracing::error!("Failed to execute query: {:?}", e);
         StoreTokenError(e)
     })?;
     Ok(())
@@ -163,7 +163,7 @@ pub async fn insert_subscriber(
     .execute(&mut **transaction)
     .await
     .map_err(|e| {
-        tracing::error!("Failed to execute query: {:?}", e);
+        // tracing::error!("Failed to execute query: {:?}", e);
         e
     })?;
     Ok(subscriber_id)
