@@ -1,5 +1,10 @@
+use argon2::password_hash::rand_core::OsRng;
+use argon2::password_hash::SaltString;
+use argon2::{Argon2, PasswordHasher};
 use once_cell::sync::Lazy;
-use sha3::Digest;
+// use rand::rngs::OsRng;
+// use sha3::Digest;
+// use rand_core::OsRng;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use uuid::Uuid;
 use wiremock::MockServer;
@@ -25,7 +30,7 @@ pub struct TestApp {
     pub db_pool: PgPool,
     pub email_server: MockServer,
     pub port: u16,
-    test_user: TestUser,
+    pub test_user: TestUser,
 }
 
 pub struct TestUser {
@@ -43,10 +48,13 @@ impl TestUser {
         }
     }
     async fn store(&self, pool: &PgPool) {
-        let mut hasher = sha3::Sha3_256::new();
-        hasher.update(self.password.as_bytes());
-        let password_hash = hasher.finalize();
-        let password_hash = format!("{:x}", password_hash);
+        let salt = SaltString::generate(&mut OsRng);
+        // let mut hasher = sha3::Sha3_256::new();
+        // hasher.update(self.password.as_bytes());
+        // let password_hash = hasher.finalize();
+        // let password_hash = format!("{:x}", password_hash);
+        let hash_password = Argon2::default().hash_password(self.password.as_bytes(), &salt);
+        let password_hash = hash_password.unwrap().to_string();
         sqlx::query!(
             "INSERT INTO users (user_id, username, password_hash)
 VALUES ($1, $2, $3)",

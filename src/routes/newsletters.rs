@@ -9,11 +9,16 @@ use actix_web::web;
 use actix_web::HttpRequest;
 use actix_web::HttpResponse;
 use actix_web::ResponseError;
-use anyhow::Context;
+use anyhow::{anyhow, Context};
+// use argon2::password_hash;
+use argon2::Argon2;
+use argon2::PasswordHash;
+use argon2::PasswordVerifier;
 use base64::{engine::general_purpose, Engine as _};
 use secrecy::ExposeSecret;
 use secrecy::SecretString;
-use sha3::Digest;
+// use sha3::Digest;
+use crate::telemetry::spawn_blocking_with_tracing;
 use sqlx::PgPool;
 
 #[derive(thiserror::Error)]
@@ -111,30 +116,90 @@ fn basic_authentication(headers: &HeaderMap) -> Result<Credentials, anyhow::Erro
     })
 }
 
-async fn validate_credenials(
-    credentials: Credentials,
+// async fn validate_credenials(
+//     credentials: Credentials,
+//     pool: &PgPool,
+// ) -> Result<uuid::Uuid, PublishError> {
+//     let mut hasher = sha3::Sha3_256::new();
+//     hasher.update(credentials.password.expose_secret().as_bytes());
+//     let result = hasher.finalize();
+//     let password_hash = format!("{:x}", result);
+//     // let password_hash = sha3::Sha3_256Core::digest(credentials.password.expose_secret().as_bytes());
+//     let user_id: Option<_> = sqlx::query!(
+//         r#"
+// SELECT user_id FROM users WHERE username = $1 AND password_hash = $2
+// "#,
+//         credentials.username,
+//         password_hash
+//     )
+//     .fetch_optional(pool)
+//     .await
+//     .context("Failed to perform a query to validate auth credentials.")
+//     .map_err(PublishError::UnexpectedError)?;
+
+//     user_id
+//         .map(|row| row.user_id)
+//         .ok_or_else(|| anyhow::anyhow!("Invalid username or password."))
+//         .map_err(PublishError::AuthError)
+// }
+
+async fn get_stored_credentials(
+    username: &str,
     pool: &PgPool,
-) -> Result<uuid::Uuid, PublishError> {
-    let mut hasher = sha3::Sha3_256::new();
-    hasher.update(credentials.password.expose_secret().as_bytes());
-    let result = hasher.finalize();
-    let password_hash = format!("{:x}", result);
-    // let password_hash = sha3::Sha3_256Core::digest(credentials.password.expose_secret().as_bytes());
-    let user_id: Option<_> = sqlx::query!(
+) -> Result<Option<(uuid::Uuid, SecretString)>, anyhow::Error> {
+    let row: Option<_> = sqlx::query!(
         r#"
-SELECT user_id FROM users WHERE username = $1 AND password_hash = $2
+SELECT user_id, password_hash FROM users WHERE username = $1
 "#,
-        credentials.username,
-        password_hash
+        username
     )
     .fetch_optional(pool)
     .await
-    .context("Failed to perform a query to validate auth credentials.")
-    .map_err(PublishError::UnexpectedError)?;
+    .context("Failed to perform a query to retrieve stored credentials.")?
+    .map(|row| (row.user_id, SecretString::from(row.password_hash)));
+    Ok(row)
+}
 
-    user_id.map(|row| row.user_id)
-        .ok_or_else(|| anyhow::anyhow!("Invalid username or password."))
+#[tracing::instrument(
+    name = "Verify password hash",
+    skip(expected_password_hash, password_candidate)
+)]
+fn verify_password_hash(
+    expected_password_hash: SecretString,
+    password_candidate: SecretString,
+) -> Result<(), PublishError> {
+    let expected_password_hash = PasswordHash::new(expected_password_hash.expose_secret())
+        .map_err(|e| anyhow!(e))
+        .context("Failed to parse hash in PHC string format.")
+        .map_err(PublishError::UnexpectedError)?;
+    Argon2::default()
+        .verify_password(
+            password_candidate.expose_secret().as_bytes(),
+            &expected_password_hash,
+        )
+        .map_err(|e| anyhow!(e))
+        .context("Invalid password.")
         .map_err(PublishError::AuthError)
+}
+
+#[tracing::instrument(name = "Validate credentials", skip(credentias, pool))]
+async fn validate_credenials(
+    credentias: Credentials,
+    pool: &PgPool,
+) -> Result<uuid::Uuid, PublishError> {
+    let (user_id, expected_password_hash) = get_stored_credentials(&credentias.username, &pool)
+        .await
+        .map_err(PublishError::UnexpectedError)?
+        .ok_or_else(|| PublishError::AuthError(anyhow!("Unknown username.")))?;
+
+    spawn_blocking_with_tracing(move || {
+        verify_password_hash(expected_password_hash, credentias.password)
+    })
+    .await
+    .context("Invalid password.")
+    .map_err(PublishError::AuthError)??;
+
+    Ok(user_id)
 }
 
 #[tracing::instrument(
