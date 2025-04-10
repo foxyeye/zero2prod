@@ -1,8 +1,12 @@
 use crate::configuration::{DatabaseSettings, Settings};
 use crate::email_client::EmailClient;
 use crate::routes::confirm;
+use crate::routes::home;
+use crate::routes::login;
+use crate::routes::login_form;
 use crate::routes::{health_check, publish_newsletter, subscribe};
 use actix_web::{dev::Server, web, App, HttpServer};
+use secrecy::SecretString;
 use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
 use std::net::TcpListener;
@@ -10,11 +14,14 @@ use tracing_actix_web::TracingLogger;
 
 pub struct ApplicationBaseUrl(pub String);
 
+pub struct HmacSecret(pub SecretString);
+
 pub fn run(
     listener: TcpListener,
     db_pool: PgPool,
     email_client: EmailClient,
     base_url: String,
+    hmac_secret: SecretString,
 ) -> Result<Server, std::io::Error> {
     let db_pool = web::Data::new(db_pool);
     let email_client = web::Data::new(email_client);
@@ -27,9 +34,13 @@ pub fn run(
             .route("/subscriptions", web::post().to(subscribe))
             .route("/subscriptions/confirm", web::get().to(confirm))
             .route("/newsletters", web::post().to(publish_newsletter))
+            .route("/", web::get().to(home))
+            .route("/login", web::get().to(login_form))
+            .route("/login", web::post().to(login))
             .app_data(db_pool.clone())
             .app_data(email_client.clone())
             .app_data(base_url.clone())
+            .app_data(web::Data::new(HmacSecret(hmac_secret.clone())))
     })
     .listen(listener)?
     .run();
@@ -71,6 +82,7 @@ impl Application {
             connection_pool,
             email_client,
             configuration.application.base_url,
+            configuration.application.hmac_secret,
         )?;
         // We "save" the bound port in one of `Application`'s fields
         Ok(Self { port, server })
