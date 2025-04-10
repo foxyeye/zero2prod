@@ -5,7 +5,11 @@ use crate::routes::home;
 use crate::routes::login;
 use crate::routes::login_form;
 use crate::routes::{health_check, publish_newsletter, subscribe};
+use actix_web::cookie::Key;
 use actix_web::{dev::Server, web, App, HttpServer};
+use actix_web_flash_messages::storage::CookieMessageStore;
+use actix_web_flash_messages::FlashMessagesFramework;
+use secrecy::ExposeSecret;
 use secrecy::SecretString;
 use sqlx::postgres::PgPoolOptions;
 use sqlx::PgPool;
@@ -26,10 +30,15 @@ pub fn run(
     let db_pool = web::Data::new(db_pool);
     let email_client = web::Data::new(email_client);
     let base_url = web::Data::new(ApplicationBaseUrl(base_url));
+    let message_store = CookieMessageStore::builder(
+        Key::from(hmac_secret.expose_secret().as_bytes())
+    ).build();
+    let message_framework = FlashMessagesFramework::builder(message_store).build();
     let server = HttpServer::new(move || {
         App::new()
             //.wrap(Logger::default())
             .wrap(TracingLogger::default())
+            .wrap(message_framework.clone())
             .route("/health_check", web::get().to(health_check))
             .route("/subscriptions", web::post().to(subscribe))
             .route("/subscriptions/confirm", web::get().to(confirm))
