@@ -2,16 +2,31 @@
 set -x
 set -eo pipefail
 
+# if a redis container is running, print instructions to kill it and exit
+RUNNING_CONTAINER=$(docker ps --filter 'name=redis' --format '{{.ID}}')
+if [[ -n $RUNNING_CONTAINER ]]; then
+    echo >&2 "there is a redis container already running, kill it with"
+    echo >&2 " docker kill ${RUNNING_CONTAINER}"
+    exit 1
+fi
+# Launch Redis using Docker
+docker run \
+    -p "6379:6379" \
+    -d \
+    --name "redis_$(date '+%s')" \
+    redis:6
+>&2 echo "Redis is ready to go!"
+
 if ! [ -x "$(command -v psql)" ]; then
-echo >&2 "Error: psql is not installed."
-exit 1
+    echo >&2 "Error: psql is not installed."
+    exit 1
 fi
 if ! [ -x "$(command -v sqlx)" ]; then
-echo >&2 "Error: sqlx is not installed."
-echo >&2 "Use:"
-echo >&2 " cargo install sqlx-cli --no-default-features --features postgres"
-echo >&2 "to install it."
-exit 1
+    echo >&2 "Error: sqlx is not installed."
+    echo >&2 "Use:"
+    echo >&2 " cargo install sqlx-cli --no-default-features --features postgres"
+    echo >&2 "to install it."
+    exit 1
 fi
 
 # Check if a custom user has been set, otherwise default to 'postgres'
@@ -24,23 +39,22 @@ DB_NAME="${POSTGRES_DB:=newsletter}"
 DB_PORT="${POSTGRES_PORT:=5432}"
 # Launch postgres using Docker
 # Allow to skip Docker if a dockerized Postgres database is already running
-if [[ -z "${SKIP_DOCKER}" ]]
-then
-docker run \
--e POSTGRES_USER=${DB_USER} \
--e POSTGRES_PASSWORD=${DB_PASSWORD} \
--e POSTGRES_DB=${DB_NAME} \
--p "${DB_PORT}":5432 \
--d postgres \
-postgres -N 1000
+if [[ -z "${SKIP_DOCKER}" ]]; then
+    docker run \
+        -e POSTGRES_USER=${DB_USER} \
+        -e POSTGRES_PASSWORD=${DB_PASSWORD} \
+        -e POSTGRES_DB=${DB_NAME} \
+        -p "${DB_PORT}":5432 \
+        -d postgres \
+        postgres -N 1000
 fi
 # ^ Increased maximum number of connections for testing purposes
 
 # Keep pinging Postgres until it's ready to accept commands
 export PGPASSWORD="${DB_PASSWORD}"
 until psql -h "localhost" -U "${DB_USER}" -p "${DB_PORT}" -d "postgres" -c '\q'; do
->&2 echo "Postgres is still unavailable - sleeping"
-sleep 1
+    >&2 echo "Postgres is still unavailable - sleeping"
+    sleep 1
 done
 >&2 echo "Postgres is up and running on port ${DB_PORT}!"
 

@@ -1,7 +1,7 @@
 // use actix_web::cookie::Cookie;
 use actix_web::http::header::ContentType;
 use actix_web::HttpResponse;
-use actix_web_flash_messages::{IncomingFlashMessages, Level};
+use actix_web_flash_messages::{IncomingFlashMessages};
 use std::fmt::Write;
 
 // use crate::startup::HmacSecret;
@@ -34,7 +34,9 @@ pub async fn login_form(flash_messages: IncomingFlashMessages) -> HttpResponse {
     //     }
     // };
     let mut error_html = String::new();
-    for m in flash_messages.iter().filter(|m| m.level() == Level::Error) {
+    for m in flash_messages.iter()
+    // .filter(|m| m.level() == Level::Error)
+    {
         writeln!(error_html, "<p><i>{}</i></p>", m.content()).unwrap();
     }
     HttpResponse::Ok()

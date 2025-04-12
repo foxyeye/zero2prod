@@ -13,8 +13,8 @@ use actix_web::ResponseError;
 use base64::{engine::general_purpose, Engine as _};
 use secrecy::SecretString;
 // use sha3::Digest;
-use crate::authentication::{validate_credenials, AuthError, Credentials};
-use anyhow::{Context};
+use crate::authentication::{validate_credentials, AuthError, Credentials};
+use anyhow::Context;
 use sqlx::PgPool;
 
 #[derive(thiserror::Error)]
@@ -107,7 +107,7 @@ fn basic_authentication(headers: &HeaderMap) -> Result<Credentials, anyhow::Erro
     })
 }
 
-// async fn validate_credenials(
+// async fn validate_credentials(
 //     credentials: Credentials,
 //     pool: &PgPool,
 // ) -> Result<uuid::Uuid, PublishError> {
@@ -147,7 +147,7 @@ pub async fn publish_newsletter(
 ) -> Result<HttpResponse, PublishError> {
     let credentials = basic_authentication(request.headers()).map_err(PublishError::AuthError)?;
     tracing::Span::current().record("username", &tracing::field::display(&credentials.username));
-    let user_id = validate_credenials(credentials, &pool)
+    let user_id = validate_credentials(credentials, &pool)
         .await
         .map_err(|e| match e {
             AuthError::InvalidCredentials(_) => PublishError::AuthError(e.into()),

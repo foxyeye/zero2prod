@@ -7,7 +7,7 @@ use zero2prod::telemetry::get_subscriber;
 use zero2prod::telemetry::init_subscriber;
 
 #[actix_web::main]
-async fn main() -> std::io::Result<()> {
+async fn main() -> anyhow::Result<()> {
     let subscriber = get_subscriber("zero2prod".into(), String::from("info"), std::io::stdout);
     init_subscriber(subscriber);
 
